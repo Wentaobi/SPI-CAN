@@ -1,0 +1,155 @@
+#include "stdafx.h"
+#include "tchar.h"
+#include "windows.h"
+#include "stdio.h"
+#include "winbase.h"
+#include <iostream>
+using namespace std;
+
+int main(void)
+{
+       HANDLE m_hComm;
+
+       m_hComm = CreateFile(
+              "\\\\.\\COM12",              
+              GENERIC_READ | GENERIC_WRITE,   
+              0,                         
+              NULL,
+              OPEN_EXISTING,              
+              0,                                              
+              NULL
+              );
+
+       if (m_hComm == INVALID_HANDLE_VALUE)
+       {
+              printf("Open Serial Fail!");
+              return FALSE;
+       }
+
+/*********************************Time out**************************************/
+       SetupComm(m_hComm, 2000, 2000);  
+
+       COMMTIMEOUTS TimeOuts;  
+       //TimeOuts.ReadIntervalTimeout = MAXDWORD;
+       TimeOuts.ReadIntervalTimeout = 0;
+       TimeOuts.ReadTotalTimeoutMultiplier = 0;
+       TimeOuts.ReadTotalTimeoutConstant = 0;
+
+       //TimeOuts.WriteTotalTimeoutMultiplier = 0;
+       //TimeOuts.WriteTotalTimeoutConstant = 0;
+       SetCommTimeouts(m_hComm, &TimeOuts);
+
+       DCB dcb;
+       GetCommState(m_hComm, &dcb);
+       dcb.BaudRate = 19200;   
+       dcb.ByteSize = 8;  
+       dcb.Parity = NOPARITY;   
+       dcb.StopBits = ONESTOPBIT;  
+       SetCommState(m_hComm, &dcb);
+
+       PurgeComm(m_hComm, PURGE_TXCLEAR | PURGE_RXCLEAR);
+
+       DWORD wCount;  
+       bool bReadStat;
+       unsigned char str1[2];
+       unsigned char str2[11];
+       unsigned int checksum = 0;
+
+       int i = 0;
+
+       while (1)
+       {
+              //PurgeComm(m_hComm, PURGE_TXCLEAR | PURGE_RXCLEAR); 
+              bReadStat = ReadFile(m_hComm, str1, 1, &wCount, NULL);
+              if (!bReadStat)
+
+              {
+                     printf("Read Serial Fail!");
+                     return FALSE;
+              }
+              else
+              {      
+                     for (i = 0; i < 11; i++)
+                     {
+                           str2[i] = str2[i + 1];
+                     }
+                     str2[11] = str1[0];
+
+                     if ((str2[0] == 0x55) && (str2[ 1] == 0x06))
+                     {
+                           checksum = (str2[1]) + (str2[ 2]);
+                           if (checksum > 256)
+                           {
+                                  checksum = checksum - 255;
+                           }
+                           checksum = checksum + (str2[ 3]);
+                            if (checksum > 256)
+                           {
+                                  checksum = checksum - 255;
+                           }
+                           checksum = checksum + (str2[ 4]);
+                           if (checksum > 256)
+                           {
+                                  checksum = checksum - 255;
+                           }
+                           checksum = checksum + (str2[ 5]);
+                           if (checksum > 256)
+                           {
+                                  checksum = checksum - 255;
+                           }
+                           checksum = checksum + (str2[ 6]);
+                           if (checksum > 256)
+                           {
+                                  checksum = checksum - 255;
+                           }
+                           checksum = checksum + (str2[ 7]);
+                           if (checksum > 256)
+                           {
+                                  checksum = checksum - 255;
+                           }
+                           checksum = checksum + (str2[ 8]);
+                           if (checksum > 256)
+                           {
+                                  checksum = checksum - 255;
+
+                           }
+                           checksum = checksum + (str2[ 9]);
+                           if (checksum > 256)
+                           {
+                                  checksum = checksum - 255;
+                           }
+                           checksum = checksum + (str2[ 10]);
+
+                           if (checksum == 255)
+                           {
+                                  printf("%4d", str2[ 2]); //2
+                                  printf("  %4d", str2[ 3]); //12~15
+                                  printf("  %4d", str2[ 4]); //0
+                                  printf("  %4d", str2[ 5]); //2
+                                  printf("  %4d", str2[ 6]); //13~16
+                                  printf("  %4d", str2[ 7]); //0
+                                  printf("  %4d", str2[ 8]);
+                                  printf("  %4d", str2[ 9]); //-1
+
+                                  if ((str2[ 3] > 19) && (str2[ 6]) > 19)
+                                  {
+                                         printf("  Hands on\n");
+                                  }
+                                  else
+                                  {
+                                         printf("  Hands off!\n");
+                                  }
+                           }
+                           //else
+                           //{
+                           //     //printf("Error data!!!\n");
+                           //}
+                           
+              
+                     }
+              }
+       }
+
+       CloseHandle(m_hComm);
+
+}
